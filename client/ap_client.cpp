@@ -36,7 +36,7 @@
 using nlohmann::json;
 static const char* GAME = "TimeSplitters 2";
 // slot_data schema this client understands; must track SLOT_DATA_VERSION in the apworld's __init__.py.
-static const int SLOT_DATA_VERSION = 7;
+static const int SLOT_DATA_VERSION = 8;
 
 // ---- shared with dllmain.cpp ----
 extern uintptr_t g_base;

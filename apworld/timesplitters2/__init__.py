@@ -23,9 +23,10 @@ MODE_BOTH, MODE_STORY_ONLY, MODE_ARCADE_ONLY = 0, 1, 2
 # client re-applies the weapon tables on every level load, so the same slot can be a different gun per level.
 SCOPE_COMPLETELY_RANDOM, SCOPE_SAME_CLASS, SCOPE_WITHIN_LEVEL = 0, 1, 2
 # slot_data schema version. Bump whenever the KEYS the client reads change, so a mismatched client can say so
-# instead of silently mis-reading a seed. 7 = added game_mode / arcade_goal_* / weapon_shuffle_scope /
+# instead of silently mis-reading a seed. 8 = added starting_units / starting_weapons (Universal Tracker regen must
+# restore the seed's starters rather than re-roll them). 7 = added game_mode / arcade_goal_* / weapon_shuffle_scope /
 # weapon_remap_by_level (6 = the pre-1.0.0 schema, which used the old content_mode key).
-SLOT_DATA_VERSION = 7
+SLOT_DATA_VERSION = 8
 
 
 class TS2Item(Item):
@@ -227,13 +228,22 @@ class TS2World(World):
         # starting items, so sphere 0 is non-empty and WHICH units you start with varies per seed. The final story
         # (Space Station) is excluded from the story starters -- it sits behind the goal gate, so starting with it
         # unlocked would just waste a starter.
-        n = self.options.starting_unlocks_per_category.value
-        story_units = [u for u in units if u in set(data.STORY_ITEMS) and u != data.FINAL_STORY_ITEM]
-        arcade_units = [u for u in units if u in data.item_name_groups["Arcade"]]
-        chal_units = [u for u in units if u in data.item_name_groups["Challenge"]]
-        starters = (self.random.sample(story_units, min(n, len(story_units)))
-                    + self.random.sample(arcade_units, min(n, len(arcade_units)))
-                    + self.random.sample(chal_units, min(n, len(chal_units))))
+        # A UT regen must reproduce the SEED's starters, never re-roll them. Two things differ on that path: the options
+        # are defaults (so `n` is wrong), and generate_early returns before the weapon-shuffle re-roll, so self.random is
+        # at a different position and sample() picks different units. Either one makes the tracker compute logic for a
+        # game nobody is playing -- e.g. crediting you with a mission's starting weapon you were never given.
+        pt = self._ut_passthrough()
+        if pt.get("starting_units") is not None:
+            starters = [u for u in pt["starting_units"] if u in units]
+        else:
+            n = self.options.starting_unlocks_per_category.value
+            story_units = [u for u in units if u in set(data.STORY_ITEMS) and u != data.FINAL_STORY_ITEM]
+            arcade_units = [u for u in units if u in data.item_name_groups["Arcade"]]
+            chal_units = [u for u in units if u in data.item_name_groups["Challenge"]]
+            starters = (self.random.sample(story_units, min(n, len(story_units)))
+                        + self.random.sample(arcade_units, min(n, len(arcade_units)))
+                        + self.random.sample(chal_units, min(n, len(chal_units))))
+        self.starters = list(starters)                 # echoed in slot_data so a UT regen can restore them exactly
         for name in starters:
             self.multiworld.push_precollected(self.create_item(name))
 
@@ -244,18 +254,23 @@ class TS2World(World):
         # Objective checks are always on, so there is always room for the full set -- no clamp (a skipped weapon would
         # silently break logic; if a pathological seed ever overflowed, a loud FillError is preferable).
         weapon_items: List[TS2Item] = []
+        self.starter_weapons: List[str] = []
         if self.gating:
             # arm EACH starting story mission: precollect the item for that mission's PRIMARY weapon (remap-aware) so
             # every sphere-0 story mission is actually playable, instead of a fixed Silenced Pistol.
-            mission_of_item = {data.ITEM_OF[m]: m for m in data.STORY}
-            starter_weapons = set()
-            for st in starters:
-                m = mission_of_item.get(st)
-                if m is not None and m in data.LEVEL_PRIMARY_SLOT:
-                    ps = data.LEVEL_PRIMARY_SLOT[m]
-                    starter_weapons.add(data.WEAPON_ITEM_OF[self._remap_for(m).get(ps, ps)])
-            if not starter_weapons:                       # no story starter -> a baseline gun so sphere 0 is still armed
-                starter_weapons.add(data.WEAPON_ITEM_OF[1])
+            if pt.get("starting_weapons") is not None:    # UT regen: restore, don't recompute (see the note above)
+                starter_weapons = {w for w in pt["starting_weapons"] if w in data.WEAPON_ITEM_OF.values()}
+            else:
+                mission_of_item = {data.ITEM_OF[m]: m for m in data.STORY}
+                starter_weapons = set()
+                for st in starters:
+                    m = mission_of_item.get(st)
+                    if m is not None and m in data.LEVEL_PRIMARY_SLOT:
+                        ps = data.LEVEL_PRIMARY_SLOT[m]
+                        starter_weapons.add(data.WEAPON_ITEM_OF[self._remap_for(m).get(ps, ps)])
+                if not starter_weapons:                   # no story starter -> a baseline gun so sphere 0 is still armed
+                    starter_weapons.add(data.WEAPON_ITEM_OF[1])
+            self.starter_weapons = sorted(starter_weapons)
             for it in starter_weapons:
                 self.multiworld.push_precollected(self.create_item(it))
             weapon_items = [self.create_item(data.WEAPON_ITEM_OF[s]) for s in data.weapon_gated_slots()
@@ -473,6 +488,12 @@ class TS2World(World):
                 m: [f"{data.WEAPONS.get(s, f'slot {s}')} -> {data.WEAPONS.get(v, f'slot {v}')}"
                     for s, v in sorted(mp.items()) if v != s]
                 for m, mp in self.weapon_remap_by_level.items()},
+            # The units + weapons this seed GRANTED at the start. Echoed purely so a Universal Tracker regen can restore
+            # them instead of re-rolling: on that path the options are defaults and generate_early consumes none of the
+            # randomness a real generation spends, so a fresh sample() picks different starters entirely. The client
+            # ignores both (the server sends precollected items normally).
+            "starting_units": sorted(getattr(self, "starters", [])),
+            "starting_weapons": sorted(getattr(self, "starter_weapons", [])),
             "death_link": bool(self.options.death_link.value),
             "version": SLOT_DATA_VERSION,
         }

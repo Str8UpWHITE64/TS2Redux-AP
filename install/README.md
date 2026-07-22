@@ -52,7 +52,7 @@ To see what is actually loaded, launch the game and look for a line like this in
 (game root), printed a few seconds after startup:
 
 ```
-[mods] loaded: DevilDwarfUI, DevildwarfMenu, DisableBreathingByDevilDwarf, DisablePreferences,
+[mods] loaded: DevilDwarfUI, DevildwarfMenu, DisablePreferences,
 FanotoMenu, GameFixesByFanotoAndDevilDwarf, InvisibleFixByDevilDwarf, Mods,
 StraightIntoTS2byDevilDwarf, UnlockArcadeAndChallengeByFanoto
 ```

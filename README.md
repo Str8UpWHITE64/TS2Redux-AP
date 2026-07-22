@@ -33,7 +33,7 @@ and emits `client/ts2_data.h`, so the Python and C++ sides always agree on item/
 ## Features
 
 - **Location checks** — arcade & challenge **trophy tiers** (Bronze → Platinum per event), **story
-  per-difficulty** completions (Easy / Normal / Hard per mission), and optional **per-objective**
+  per-difficulty** completions (Easy / Normal / Hard per mission), and **per-objective**
   completions.
 - **Weapons as items** — two modes: **gating** (weapons stay locked until you receive them) and
   **shuffle** (one global mapping remaps your loadout, level pickups, and enemy weapons).

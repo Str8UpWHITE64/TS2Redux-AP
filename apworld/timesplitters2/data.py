@@ -435,14 +435,17 @@ LEVEL_NH_ONLY_SLOTS = {
 # The PRIMARY weapon each mission hands you first: precollected (remap-aware) when the mission is a STARTING unlock, so
 # you begin armed for the mission(s) you start with. The SECONDARY weapon is additionally required to complete the
 # mission on HARD (one gun is brutal on Hard). Both are pickup SLOTS in the mission -- under shuffle the requirement
-# follows whatever gun lands at that slot. Space Station has neither (it sits behind the Time Crystal goal gate).
+# follows whatever gun lands at that slot. Space Station has no PRIMARY: it can never be a starting unlock (it sits
+# behind the Time Crystal goal gate), so there is no start-of-seed loadout to seed.
 LEVEL_PRIMARY_SLOT = {
     "Siberia": 1, "Chicago": 3, "Notre Dame": 32, "Return to Planet X": 18, "NeoTokyo": 1,
     "Wild West": 7, "Atom Smasher": 1, "Aztec": 37, "Robot Factory": 18,
 }
+# Space Station's only combat weapons are the Plasma Autorifle (22, its early pickup) and the Minigun (10) -- slot 36 is
+# the baseline Temporal Uplink -- so the Minigun is the only possible second gun for the final mission on Hard.
 LEVEL_HARD_SECONDARY = {
     "Siberia": 11, "Chicago": 12, "Notre Dame": 5, "Return to Planet X": 22, "NeoTokyo": 11,
-    "Wild West": 12, "Atom Smasher": 2, "Aztec": 5, "Robot Factory": 22,
+    "Wild West": 12, "Atom Smasher": 2, "Aztec": 5, "Robot Factory": 22, "Space Station": 10,
 }
 WEAPON_COMBAT = WEAPON_REG | WEAPON_EXP | WEAPON_MINE | WEAPON_FIRE   # tools (Camera/ElectroTool/Gun Powder) are NOT combat
 

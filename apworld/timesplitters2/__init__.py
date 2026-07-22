@@ -394,29 +394,32 @@ class TS2World(World):
             return next((d for d in DORDER if d in appears), easiest)
 
         for loc_name, unit in self._unit_of.items():
-            if unit == final:                                      # Space Station (+ its objectives): behind the goal gate
-                get(loc_name, p).access_rule = goal_rule
-                continue
+            # Space Station and its objectives sit behind the goal gate (its own unlock + the required Time Crystals)
+            # IN ADDITION to the normal weapon logic. The gate used to REPLACE that logic, which meant the final
+            # mission was considered clearable with no weapon at all -- and worse, its own early weapon could then be
+            # placed on one of its locations, which cannot be collected without first clearing it.
+            gate = goal_rule if unit == final else None
             info = data.OBJ_LOC_INFO.get(loc_name)
+            mc = misscomp.get(loc_name)
             if gating and info is not None:                       # in-mission objective
                 tid, prim, sec, mission = info
                 if tid == data.ESCAPE_TEXTID or (mission, tid) in data.MISSION_COMPLETE_OBJS:   # earned by finishing the mission
                     d = easiest_for(prim, sec)                    # Escape (prim=all) -> global easiest; others -> easiest they appear on
-                    get(loc_name, p).access_rule = (lambda state, m=mission, d=d, u=unit:
+                    rule = (lambda state, m=mission, d=d, u=unit:
                         state.has(u, p) and complete_ok(m, d, frozenset({d}), state))
                 else:
                     d = easiest_for(prim, sec)
                     r = data.objective_rule(mission, tid)
-                    get(loc_name, p).access_rule = (lambda state, m=mission, d=d, r=r, u=unit:
+                    rule = (lambda state, m=mission, d=d, r=r, u=unit:
                         state.has(u, p) and armed(m, d, state) and r(make_h(m, d, state)))
-                continue
-            mc = misscomp.get(loc_name)
-            if gating and mc is not None:                         # story mission-completion on a difficulty
+            elif gating and mc is not None:                       # story mission-completion on a difficulty
                 m, d = mc
-                get(loc_name, p).access_rule = (lambda state, m=m, d=d, u=unit:
+                rule = (lambda state, m=m, d=d, u=unit:
                     state.has(u, p) and complete_ok(m, d, frozenset({d}), state))
-                continue
-            get(loc_name, p).access_rule = (lambda state, u=unit: state.has(u, p))
+            else:
+                rule = (lambda state, u=unit: state.has(u, p))
+            get(loc_name, p).access_rule = rule if gate is None else (
+                lambda state, rule=rule, gate=gate: gate(state) and rule(state))
 
         get("Victory", p).access_rule = goal_rule
         self.multiworld.completion_condition[p] = lambda state: state.has("Victory", p)

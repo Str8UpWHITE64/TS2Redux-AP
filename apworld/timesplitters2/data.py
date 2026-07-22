@@ -245,8 +245,6 @@ OBJ_RULES = {
     ("Chicago", 1075):       lambda h: h("MINE"),                                      # Obtain the Nightclub pass card
     ("NeoTokyo", 1093):      lambda h: h("CAMERA") and (h("REG") or h("EXP")),         # Gather evidence
     ("NeoTokyo", 1094):      lambda h: h("CAMERA") and (h("REG") or h("EXP")),         # Upload the evidence
-    # Confirmed in-game: no explosives needed -- shooting it is enough, which matches NeoTokyo's own pickups (REG + Camera,
-    # no EXP/MINE anywhere in the level).
     ("NeoTokyo", 1095):      lambda h: h("REG"),                                       # Deactivate the TimeSplitter machine
     # Ramona's jail: on NORMAL/HARD you have to blow it open -- the Gun Powder (the level's own answer) OR any explosive
     # / mine works (Rocket Launcher confirmed in-game, which only reaches Wild West via the weapon shuffle). On EASY you

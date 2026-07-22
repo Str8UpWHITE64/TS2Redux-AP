@@ -1,0 +1,46 @@
+# --- Python (apworld) ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# --- Release artifacts (built on demand, never commit) ---
+*.apworld
+install/TS2Redux-AP-*.zip
+
+# --- Third-party build dependencies (not vendored; obtain per client/DEPENDENCIES.md) ---
+client/libs/
+
+# --- Visual Studio / MSBuild build outputs ---
+x64/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+*.obj
+*.pdb
+*.idb
+*.ilk
+*.iobj
+*.ipdb
+*.exp
+*.lib
+*.dll
+*.log
+*.tlog/
+*.recipe
+*.lastbuildstate
+*FileListAbsolute.txt
+*.vcxproj.user
+
+# --- IDEs / OS ---
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- AP client runtime files (created in the game root at runtime) ---
+AP_client.log
+AP_capture.txt
+ap_saves/

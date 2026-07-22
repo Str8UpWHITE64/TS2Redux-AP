@@ -1,0 +1,17 @@
+# Normalize line endings in the repository so contributors on different platforms don't produce
+# whole-file diffs. Working copies still get native endings on checkout.
+* text=auto
+
+*.cpp    text diff=cpp
+*.h      text diff=cpp
+*.py     text diff=python
+*.md     text
+*.json   text
+*.cfg    text
+
+# MSBuild rewrites project files with CRLF; keeping them CRLF avoids spurious churn.
+*.vcxproj text eol=crlf
+
+*.dll    binary
+*.zip    binary
+*.apworld binary

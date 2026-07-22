@@ -64,6 +64,12 @@ static const uintptr_t PAGE_WIDGETS = 0x70, WIDGET_NEXT = 0x3c0, WIDGET_TREE = 0
 static const uintptr_t PAGE_HEADER = 0x650, PAGE_DESC = 0x08, DESC_NAME = 0x28;  // page header char* + identity name
 static const uintptr_t N_L1 = 0x10, N_L2 = 0x18, N_L3 = 0x20, E_LABEL = 0x38, E_FLAGS = 0x44, E_ACTION = 0x50;
 static const uintptr_t P_SIZE = 0x20e4, P_TROPHYTABLE = 0x11cc;  // trophy record: +0xc=tier(i3), +0x10=completed(i4)
+// Profile name: a NUL-padded ASCII field at the very top of the profile struct (real profile data resumes at 0x20).
+// We stamp the Archipelago slot name into it for a NEW seed so the auto-created profile is identifiable in the game's
+// profile list. Capped well short of the field: the game's own name-entry UI is much shorter than 32, and a name that
+// overruns what the menu expects would only look wrong, so leave headroom.
+static const uintptr_t P_NAME_OFF = 0x00;
+static const int       P_NAME_LEN = 0x20, P_NAME_MAX = 15;
 
 // ---- SEH-guarded memory access (no C++ objects in these functions) ----
 static unsigned long long rd64(uintptr_t a) { __try { return *(volatile unsigned long long*)a; } __except(EXCEPTION_EXECUTE_HANDLER) { return 0; } }
@@ -89,6 +95,7 @@ static std::string sanitize(const std::string& s) {     // make a seed/slot stri
 static FILE* g_log = nullptr;
 static APClient* g_ap = nullptr;
 static volatile bool g_connected = false;
+static std::string g_slotName;                           // from AP_client.cfg; stamped into a new seed's profile name
 static bool g_unlocked[ts2::UNIT_COUNT];                 // by unit index; written by items_received
 static std::unordered_map<std::string, int> g_nameToUnit; // label -> unit index
 static std::set<int64_t> g_sent;                         // location ids already sent this session
@@ -421,6 +428,19 @@ static void loadGrant() {
     std::ifstream f(g_seedFile + ".grant", std::ios::binary);
     if (f) { f.read((char*)g_bonusGranted, sizeof(g_bonusGranted)); f.read((char*)g_trapGranted, sizeof(g_trapGranted)); }
 }
+// Overwrite the profile's name field with the slot name. TS2's menu font is ASCII, so non-printable characters are
+// dropped rather than rendered as garbage; if nothing usable survives we leave the blob's own default name alone.
+static void stampProfileName(uintptr_t prof, const std::string& name) {
+    unsigned char buf[P_NAME_LEN] = { 0 };                       // zero-filled: also clears the rest of the field
+    int n = 0;
+    for (char c : name) {
+        if (n >= P_NAME_MAX) break;
+        if (c >= 0x20 && c <= 0x7e) buf[n++] = (unsigned char)c;
+    }
+    if (n == 0) return;
+    wrbuf(prof + P_NAME_OFF, buf, P_NAME_LEN);
+}
+
 static void autoLoad() {
     uintptr_t prof = activeProf(); if (!prof) return;            // profile not allocated yet -> retry next poll
     std::ifstream f(g_seedFile, std::ios::binary);
@@ -430,7 +450,8 @@ static void autoLoad() {
         else aplog("[autoload] %s too small (%d) -> skipped", g_seedFile.c_str(), (int)buf.size());
     } else {
         wrbuf(prof, ts2_fresh_profile, (int)P_SIZE);             // new seed -> embedded clean profile
-        aplog("[autoload] new seed -> fresh profile -> %s", g_seedFile.c_str());
+        stampProfileName(prof, g_slotName);                      // name it after the AP slot, not the generic default
+        aplog("[autoload] new seed -> fresh profile '%s' -> %s", g_slotName.c_str(), g_seedFile.c_str());
         saveBlob();
     }
     g_loadedSeedFile = g_seedFile;
@@ -481,6 +502,7 @@ static DWORD WINAPI apThread(LPVOID) {
     for (const auto& u : ts2::UNITS) g_nameToUnit[u.name] = u.index;
 
     ApCfg cfg = readCfg();
+    g_slotName = cfg.slot;
     bool pinned = cfg.host.find("://") != std::string::npos;
     aplog("AP client (TS2) starting. host=%s slot=%s (%s)", cfg.host.c_str(), cfg.slot.c_str(),
           pinned ? "scheme given -- using it as-is, no fallback"

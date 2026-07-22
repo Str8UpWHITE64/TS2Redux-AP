@@ -13,7 +13,7 @@ DeathLink). Every game-memory access is SEH-guarded so a bad read can't crash th
 | `dllmain.cpp` | DllMain, the menu lock + hooks (objective render, Robot Factory fix, weapon precache), traps/bonus, and the player-effect API (health/armor/ammo, cheats, the DeathLink kill). |
 | `ap_client.cpp` | Archipelago networking (apclientpp): reads `AP_client.cfg`, sends checks, applies received items, per-seed saves in `ap_saves/`, DeathLink. |
 | `ts2_data.h` | **Generated** from `apworld/timesplitters2/data.py` by `gen_header.py` — keeps ids/names in lockstep with the apworld. Committed; regenerate when ids change. |
-| `ts2_fresh_profile.h` | Embedded clean-profile blob (RE-derived offsets) used to isolate each AP seed's save. |
+| `ts2_fresh_profile.h` | Embedded clean-profile blob used to isolate each AP seed's save. On a new seed the client stamps your slot name into the profile's name field, so the auto-created profile is identifiable in-game. |
 | `RFPatch/` | Standalone Robot Factory crash-fix DLL (the fix is also applied in-process by `dllmain.cpp`). |
 | `DEPENDENCIES.md` | The third-party libraries the build needs (with versions) and where to place them under `libs/`. |
 

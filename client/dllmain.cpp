@@ -574,6 +574,13 @@ static inline bool wpnLocked(int s) {
     int w = wpnEff(s);
     return g_weaponIsItem[w] && !g_weaponUnlocked[w];
 }
+// The placeable-mine class by WEAPON IDENTITY (shuffle-aware via wpnEff): Proximity / Remote / Timed / TNT. These double
+// as the "explosive" answer to destruction objectives, but TNT stacks to a SINGLE charge -- so a mission that expects
+// several detonations (Siberia's Timed Mine, Chicago's TNT) is unwinnable from one mine with no floor resupply. weaponPass
+// keeps an owned mine topped to its ammo-max every poll, making it effectively unlimited once you've acquired it.
+static inline bool wpnIsMine(int identity) {
+    return identity == 24 || identity == 25 || identity == 26 || identity == 27;
+}
 
 // once-per-pawn remap tracking, reset on mission change
 static uintptr_t g_wpnSeen[1024]; static int g_wpnSeenN = 0; static int g_wpnSeenMission = -2; static bool g_wpnLogged = false;
@@ -719,6 +726,20 @@ static void weaponPass() {
                                     int nv = *a + add; if (nv > mxs) nv = mxs;
                                     if (nv > *a) *a = nv;
                                 }
+                            }
+                        }
+                    }
+                    // Placeable mines (see wpnIsMine): refill to the type's max every poll while owned+unlocked, so the
+                    // single-charge TNT (and any mine used as an objective's explosive) supports repeated detonations.
+                    if (owned && !wpnLocked(s) && wpnIsMine(wpnEff(s))) {
+                        int sid = *(volatile int*)(g_base + 0x2512a20 + (uintptr_t)s * 0x30 + 0xc);
+                        if ((unsigned)sid < 0x40) {
+                            int at = *(volatile int*)(g_base + 0x250c2a8 + (uintptr_t)sid * 0x240 + 0x8);   // primary type = mine count
+                            if ((unsigned)at < 0x2a) {
+                                int mx = *(volatile int*)(g_base + 0x250a130 + (uintptr_t)at * 0xf0);
+                                if (mx <= 0 || mx >= 0x100000) mx = 1;
+                                volatile int* a = (volatile int*)(pawn + OFF_WAMMO + at * 4);
+                                if (*a < mx) *a = mx;
                             }
                         }
                     }

@@ -436,7 +436,18 @@ class TS2World(World):
             get(loc_name, p).access_rule = rule if gate is None else (
                 lambda state, rule=rule, gate=gate: gate(state) and rule(state))
 
-        get("Victory", p).access_rule = goal_rule
+        # Victory needs more than the Time Crystals: you actually have to CLEAR Space Station on the goal difficulty,
+        # which (under gating) needs its weapons -- the Plasma Autorifle, plus the Minigun on Hard. goal_rule alone
+        # (unlock + Time Crystals) let go-mode fire before those weapons were in logic, so a tracker showed go-mode while
+        # the Space Station checks stayed dark. Only in story modes with gating; goal_rule stays the per-location gate
+        # (each Space Station location already ANDs in its OWN difficulty's weapon rule, so it must not inherit Hard's).
+        if self.mode != MODE_ARCADE_ONLY and gating:
+            gd = self.goal_difficulty
+            def victory_rule(state) -> bool:
+                return goal_rule(state) and complete_ok(data.FINAL_STORY_MISSION, gd, frozenset({gd}), state)
+        else:
+            victory_rule = goal_rule
+        get("Victory", p).access_rule = victory_rule
         self.multiworld.completion_condition[p] = lambda state: state.has("Victory", p)
 
     # ---- client handshake ----

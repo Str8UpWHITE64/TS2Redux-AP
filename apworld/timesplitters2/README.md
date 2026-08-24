@@ -61,6 +61,7 @@ arrived, which is what ties the final mission to the multiworld rather than to y
 | `bonus_ammo_packs` | 0–30 | 3 | one-time full-ammo pickups |
 | `trap_count` | 0–60 | 8 | number of trap items placed |
 | `death_link` | toggle | off | share deaths with other DeathLink players |
+| `arcade_death_link_threshold` | 0–50 | 10 | DeathLink: how many Arcade/Challenge deaths before one is sent out (they are deathmatches). Story sends every death; incoming deaths always apply everywhere and never count toward this. 0 = never send from Arcade/Challenge |
 
 Plus the standard `start_inventory_from_pool`.
 

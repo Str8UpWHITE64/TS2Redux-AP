@@ -45,7 +45,8 @@ and emits `client/ts2_data.h`, so the Python and C++ sides always agree on item/
   rotating heads, slow-mo deaths) that fire briefly during story missions.
 - **Bonus / filler** — one-time Health, Armor, and Ammo packs, granted the next time you're in a level.
 - **[DeathLink](https://archipelago.gg/tutorial/Archipelago/death_link/en)** — opt-in; your death
-  takes the linked players with you, and theirs takes you.
+  takes the linked players with you, and theirs takes you. Incoming deaths apply anywhere, but since Arcade
+  and Challenge are deathmatches, deaths there only go out once every *N* (configurable, or never).
 
 See [`apworld/timesplitters2/README.md`](apworld/timesplitters2/README.md) for the full item /
 location / option breakdown.

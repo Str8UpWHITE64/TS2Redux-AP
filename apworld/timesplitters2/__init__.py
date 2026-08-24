@@ -23,10 +23,10 @@ MODE_BOTH, MODE_STORY_ONLY, MODE_ARCADE_ONLY = 0, 1, 2
 # client re-applies the weapon tables on every level load, so the same slot can be a different gun per level.
 SCOPE_COMPLETELY_RANDOM, SCOPE_SAME_CLASS, SCOPE_WITHIN_LEVEL = 0, 1, 2
 # slot_data schema version. Bump whenever the KEYS the client reads change, so a mismatched client can say so
-# instead of silently mis-reading a seed. 8 = added starting_units / starting_weapons (Universal Tracker regen must
-# restore the seed's starters rather than re-roll them). 7 = added game_mode / arcade_goal_* / weapon_shuffle_scope /
-# weapon_remap_by_level (6 = the pre-1.0.0 schema, which used the old content_mode key).
-SLOT_DATA_VERSION = 8
+# instead of silently mis-reading a seed. 9 = added arcade_death_link_threshold. 8 = added starting_units /
+# starting_weapons (Universal Tracker regen must restore the seed's starters rather than re-roll them). 7 = added
+# game_mode / arcade_goal_* / weapon_shuffle_scope / weapon_remap_by_level (6 = the pre-1.0.0 schema, old content_mode).
+SLOT_DATA_VERSION = 9
 
 
 class TS2Item(Item):
@@ -506,5 +506,9 @@ class TS2World(World):
             "starting_units": sorted(getattr(self, "starters", [])),
             "starting_weapons": sorted(getattr(self, "starter_weapons", [])),
             "death_link": bool(self.options.death_link.value),
+            # DeathLink outgoing throttle for Arcade + Challenge (deathmatch there means constant deaths).
+            # The client sends one death per this many; 0 = never send from those modes. Story always sends
+            # every death, and incoming deaths always apply everywhere, so this only limits what we broadcast.
+            "arcade_death_link_threshold": self.options.arcade_death_link_threshold.value,
             "version": SLOT_DATA_VERSION,
         }

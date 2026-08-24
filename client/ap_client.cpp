@@ -36,7 +36,7 @@
 using nlohmann::json;
 static const char* GAME = "TimeSplitters 2";
 // slot_data schema this client understands; must track SLOT_DATA_VERSION in the apworld's __init__.py.
-static const int SLOT_DATA_VERSION = 8;
+static const int SLOT_DATA_VERSION = 9;
 
 // ---- shared with dllmain.cpp ----
 extern uintptr_t g_base;
@@ -120,6 +120,12 @@ static bool g_deathLink = false;                        // from slot_data
 static volatile bool g_deathPending = false;            // an incoming death to apply on the next in-level poll
 static volatile bool g_deathSuppress = false;           // the next own-death is one we applied -> don't re-send
 static bool g_wasAlive = false;                          // player alive in a level last poll (edge detector)
+// Outgoing throttle for ARCADE + CHALLENGE only. Those modes are deathmatches -- you die constantly -- so sending
+// every death would flood the multiworld. Deaths there accumulate across matches for the whole session; on reaching
+// the threshold we send ONE death and reset. Story sends every death immediately, and INCOMING deaths never count
+// (they are consumed by the g_deathSuppress branch). 0 = never send from arcade/challenge.
+static int  g_arcadeDeathThreshold = 0;                  // from slot_data
+static int  g_arcadeDeathCount = 0;                      // session count of our own arcade/challenge deaths
 static int  g_objPrimMask[640] = {0};                   // from slot_data; per-objective primary-difficulty bitmask
                                                         // (Easy=1 Normal=2 Hard=4); idx = mission*64 + (textID-1062)
 
@@ -545,6 +551,10 @@ static DWORD WINAPI apThread(LPVOID) {
         g_objectiveChecks = slotData.value("objective_checks", false);    // enable objective-complete checks
         g_deathLink = slotData.value("death_link", false);                // deathlink: opt in -> advertise the tag + send/apply deaths
         g_deathPending = false; g_deathSuppress = false; g_wasAlive = false;
+        // Fall back to the option's own default, not 0: a seed rolled before this option existed has no key, and
+        // 0 would silently stop it sending arcade deaths at all rather than just throttling them.
+        g_arcadeDeathThreshold = slotData.value("arcade_death_link_threshold", 10);
+        g_arcadeDeathCount = 0;                                       // session counter -- fresh on every connect
         if (g_deathLink) g_ap->ConnectUpdate(0b111, std::list<std::string>{"AP", "DeathLink"});
         memset(g_objPrimMask, 0, sizeof(g_objPrimMask));
         if (slotData.contains("objective_primary")) {                     // per-objective primary-difficulty masks
@@ -646,8 +656,29 @@ static DWORD WINAPI apThread(LPVOID) {
                 if (g_wasAlive && dead) {                                  // we just died this poll
                     if (g_deathSuppress) { g_deathSuppress = false; aplog("[deathlink] own death (we applied it) -- not echoed"); }
                     else {
-                        json d = { {"time", g_ap->get_server_time()}, {"source", cfg.slot}, {"cause", cfg.slot + " bit the dust"} };
-                        g_ap->Bounce(d, {}, {}, {"DeathLink"}); aplog("[deathlink] our death -> Bounce sent");
+                        // Story sends every death. Arcade/Challenge are deathmatches, so they only send once every
+                        // g_arcadeDeathThreshold deaths (counted across matches for the session, then reset); 0 there
+                        // means never send. Incoming deaths can't reach here -- they leave via the suppress branch --
+                        // so a death we were GIVEN never advances the counter.
+                        bool send = true;
+                        if (!g_inStory) {
+                            if (g_arcadeDeathThreshold <= 0) {
+                                send = false;
+                                aplog("[deathlink] arcade/challenge death -- outgoing disabled (threshold 0)");
+                            } else if (++g_arcadeDeathCount < g_arcadeDeathThreshold) {
+                                send = false;
+                                aplog("[deathlink] arcade/challenge death %d/%d -- holding",
+                                      g_arcadeDeathCount, g_arcadeDeathThreshold);
+                            } else {
+                                g_arcadeDeathCount = 0;                    // threshold met -> send one, start over
+                                aplog("[deathlink] arcade/challenge death %d/%d -- threshold reached",
+                                      g_arcadeDeathThreshold, g_arcadeDeathThreshold);
+                            }
+                        }
+                        if (send) {
+                            json d = { {"time", g_ap->get_server_time()}, {"source", cfg.slot}, {"cause", cfg.slot + " bit the dust"} };
+                            g_ap->Bounce(d, {}, {}, {"DeathLink"}); aplog("[deathlink] our death -> Bounce sent");
+                        }
                     }
                 }
                 g_wasAlive = alive;

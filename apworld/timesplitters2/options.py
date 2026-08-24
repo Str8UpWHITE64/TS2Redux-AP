@@ -166,6 +166,22 @@ class WeaponShuffleScope(Choice):
     default = 0
 
 
+class ArcadeDeathLinkThreshold(Range):
+    """DeathLink, ARCADE + CHALLENGE only: how many deaths there before one is sent out.
+
+    Arcade matches are deathmatches -- you die constantly -- so sending every one would flood the multiworld. Deaths
+    accumulate across matches and challenges for the whole session; each time the count reaches this number, one
+    DeathLink is sent and the count resets. Deaths you RECEIVE never count toward it.
+
+    Story missions are unaffected: every story death sends immediately. Incoming deaths always apply everywhere,
+    Arcade and Challenge included. 1 = send every arcade/challenge death. 0 = never send from Arcade or Challenge
+    (you still receive). Ignored unless DeathLink is on."""
+    display_name = "Arcade DeathLink Threshold"
+    range_start = 0
+    range_end = 50
+    default = 10
+
+
 @dataclass
 class TS2Options(PerGameCommonOptions):
     game_mode: GameMode
@@ -183,4 +199,5 @@ class TS2Options(PerGameCommonOptions):
     weapon_shuffle: WeaponShuffle
     weapon_shuffle_scope: WeaponShuffleScope
     death_link: DeathLink
+    arcade_death_link_threshold: ArcadeDeathLinkThreshold
     start_inventory_from_pool: StartInventoryPool

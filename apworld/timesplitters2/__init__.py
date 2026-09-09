@@ -37,6 +37,12 @@ SCOPE_COMPLETELY_RANDOM, SCOPE_SAME_CLASS, SCOPE_WITHIN_LEVEL = 0, 1, 2
 # weapon_remap_by_level (6 = the pre-1.0.0 schema, which used the old content_mode key).
 SLOT_DATA_VERSION = 10
 
+# Smallest Time Crystal gate the density clamp is allowed to leave behind. The clamp scales the gate down to what a
+# seed's free locations can hold, and on the tightest Story layout (Story-only, Easy, gating on) that bottoms out here.
+# Below this it stops feeling like a gate at all, so make the floor explicit rather than leave it emergent. It limits
+# only the CLAMP: a player who deliberately asks for fewer crystals -- 0 included -- still gets exactly what they asked.
+TC_REQUIRED_FLOOR = 7
+
 
 class TS2Item(Item):
     game = "TimeSplitters 2"
@@ -326,7 +332,10 @@ class TS2World(World):
             cap = slack * 4 // 5
             want_required = self.options.time_crystals_required.value
             want_total = want_required + self.options.time_crystals_extra.value
-            self.tc_total = min(want_total, cap)
+            floor = min(want_required, TC_REQUIRED_FLOOR)   # honours a deliberately small request
+            # Keep the gate at the floor even when the density heuristic wants less, but never place more crystals
+            # than there are free locations to hold them.
+            self.tc_total = min(max(min(want_total, cap), floor), slack)
             self.tc_required = min(want_required, self.tc_total)
             if self.tc_total < want_total or self.tc_required < want_required:
                 logging.warning("TimeSplitters 2 (player %d): Time Crystals reduced to %d placed / %d required (wanted "

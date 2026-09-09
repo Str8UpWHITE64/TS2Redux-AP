@@ -36,7 +36,7 @@
 using nlohmann::json;
 static const char* GAME = "TimeSplitters 2";
 // slot_data schema this client understands; must track SLOT_DATA_VERSION in the apworld's __init__.py.
-static const int SLOT_DATA_VERSION = 9;
+static const int SLOT_DATA_VERSION = 10;
 
 // ---- shared with dllmain.cpp ----
 extern uintptr_t g_base;
@@ -285,12 +285,15 @@ static void applyLocks() {
 
 static bool g_goalSent = false;
 static int  g_goalTier = 1;   // goal_difficulty as a tier (1=Easy 2=Normal 3=Hard); GOAL fires only when Space Station's cleared tier >= this
-// Game Mode (slot_data game_mode): 0=both 1=story_only 2=arcade_only. In arcade_only there is no Space Station
-// clear to finish on, so the GOAL instead fires once g_arcadeGoalChecks Arcade/Challenge checks are done (see
-// detectTrophies). g_maxTiers bounds the per-event tier count to the tiers the seed actually made locations for.
-static int  g_contentMode = 0;
-static int  g_arcadeGoalChecks = 0;
+// Game Modes (slot_data game_modes). Story decides whether a Space Station clear wins; without it the GOAL instead
+// fires once g_trophyGoalChecks trophy checks are done (see detectTrophies). Only the events flagged in g_goalEvent
+// count, so an Arcade trophy can never advance a Challenge-only goal. g_maxTiers bounds the per-event tier count to
+// the tiers the seed actually made locations for. Pre-1.0.2 seeds carried a single game_mode int instead; the reader
+// below falls back to it so those seeds still play correctly.
+static bool g_storyContent = true;
+static int  g_trophyGoalChecks = 0;
 static int  g_maxTiers = 4;
+static bool g_goalEvent[ts2::TROPHY_EVENT_COUNT];   // per event index: does its trophy count toward the goal?
 
 // ---- detection: trophy table -> LocationChecks for each achieved tier ----
 static void detectTrophies() {
@@ -310,18 +313,19 @@ static void detectTrophies() {
             int64_t loc = ts2::trophyLocId(ei, t);
             if (g_sent.insert(loc).second) fresh.push_back(loc);
         }
-        achieved += (tier < g_maxTiers ? tier : g_maxTiers);
+        if (ei >= 0 && ei < ts2::TROPHY_EVENT_COUNT && g_goalEvent[ei])
+            achieved += (tier < g_maxTiers ? tier : g_maxTiers);      // only modes this seed kept advance the goal
     }
     if (!fresh.empty() && g_ap) {
         g_ap->LocationChecks(std::list<int64_t>(fresh.begin(), fresh.end()));
         for (int64_t id : fresh) aplog("[check] trophy loc id=%lld", (long long)id);
         g_saveDirty = true;
     }
-    // arcade_only GOAL: no Space Station to clear, so finish on the chosen share of the Arcade/Challenge checks.
-    if (g_contentMode == 2 && !g_goalSent && g_ap && g_arcadeGoalChecks > 0 && achieved >= g_arcadeGoalChecks) {
+    // No-Story GOAL: nothing to clear, so finish on the chosen share of the trophy checks this seed kept.
+    if (!g_storyContent && !g_goalSent && g_ap && g_trophyGoalChecks > 0 && achieved >= g_trophyGoalChecks) {
         g_goalSent = true;
         g_ap->StatusUpdate(APClient::ClientStatus::GOAL);
-        aplog("[GOAL] arcade_only: %d/%d Arcade+Challenge checks done -> StatusUpdate(GOAL)", achieved, g_arcadeGoalChecks);
+        aplog("[GOAL] %d/%d trophy checks done -> StatusUpdate(GOAL)", achieved, g_trophyGoalChecks);
     }
 }
 
@@ -381,7 +385,7 @@ static void detectStory() {
         }
         // arcade_only finishes on the Arcade/Challenge share (detectTrophies), so a Space Station clear must NOT win --
         // the story is still fully playable there, it just has no checks.
-        if (g_contentMode != 2 && m == ts2::STORY_COUNT - 1 && !g_goalSent && g_ap && maxTier >= g_goalTier) {   // Space Station cleared on the goal difficulty
+        if (g_storyContent && m == ts2::STORY_COUNT - 1 && !g_goalSent && g_ap && maxTier >= g_goalTier) {   // Space Station cleared on the goal difficulty
             g_goalSent = true;
             g_ap->StatusUpdate(APClient::ClientStatus::GOAL);
             aplog("[GOAL] Space Station cleared (tier %d >= goal %d) -> StatusUpdate(GOAL)", maxTier, g_goalTier);
@@ -537,17 +541,40 @@ static DWORD WINAPI apThread(LPVOID) {
           if (sv != SLOT_DATA_VERSION)
               aplog("[warn] slot_data schema v%d, this client expects v%d -- apworld and client versions differ. "
                     "Update whichever is older if anything behaves oddly.", sv, SLOT_DATA_VERSION); }
-        // "game_mode" as of the release rename; fall back to the old "content_mode" so a seed made before it
-        // still reports the right mode instead of silently defaulting to both.
-        g_contentMode      = slotData.value("game_mode", slotData.value("content_mode", 0));
-        g_arcadeGoalChecks = slotData.value("arcade_goal_checks", 0);     // arcade_only: GOAL at this many Arcade/Challenge checks
+        // Game Modes. A 1.0.2+ seed sends the mode list plus the exact events that count; anything older sends only
+        // the old game_mode int (0=both 1=story_only 2=arcade_only), where every event counted. Read the new keys when
+        // they are there and derive the same thing from the int when they are not, so old seeds keep working.
+        for (int i = 0; i < ts2::TROPHY_EVENT_COUNT; i++) g_goalEvent[i] = false;
+        if (slotData.contains("story_content")) {
+            g_storyContent     = slotData.value("story_content", true);
+            g_trophyGoalChecks = slotData.value("trophy_goal_checks", 0);
+            if (slotData.contains("goal_trophy_events"))
+                for (auto& e : slotData["goal_trophy_events"]) {
+                    int ei = e.get<int>();
+                    if (ei >= 0 && ei < ts2::TROPHY_EVENT_COUNT) g_goalEvent[ei] = true;
+                }
+            std::string modes;
+            if (slotData.contains("game_modes"))
+                for (auto& m : slotData["game_modes"]) { if (!modes.empty()) modes += "+"; modes += m.get<std::string>(); }
+            aplog("[modes] %s", modes.empty() ? "(none listed)" : modes.c_str());
+        } else {
+            int legacy         = slotData.value("game_mode", slotData.value("content_mode", 0));
+            g_storyContent     = (legacy != 2);
+            g_trophyGoalChecks = slotData.value("arcade_goal_checks", 0);
+            for (int i = 0; i < ts2::TROPHY_EVENT_COUNT; i++) g_goalEvent[i] = true;   // pre-1.0.2: every event counted
+            aplog("[modes] pre-1.0.2 seed (game_mode=%d) -- all %d trophy events count toward the goal",
+                  legacy, ts2::TROPHY_EVENT_COUNT);
+        }
         g_maxTiers = 4;
         if (slotData.contains("trophy_tier_checks")) {                    // how many tiers the seed made locations for
             int n = (int)slotData["trophy_tier_checks"].size();
             if (n >= 1 && n <= 4) g_maxTiers = n;
         }
-        if (g_contentMode == 2)
-            aplog("[GOAL] arcade_only: need %d Arcade/Challenge checks (tiers per event: %d)", g_arcadeGoalChecks, g_maxTiers);
+        if (!g_storyContent) {
+            int n = 0; for (int i = 0; i < ts2::TROPHY_EVENT_COUNT; i++) if (g_goalEvent[i]) n++;
+            aplog("[GOAL] no Story: need %d trophy checks over %d events (tiers per event: %d)",
+                  g_trophyGoalChecks, n, g_maxTiers);
+        }
         g_objectiveChecks = slotData.value("objective_checks", false);    // enable objective-complete checks
         g_deathLink = slotData.value("death_link", false);                // deathlink: opt in -> advertise the tag + send/apply deaths
         g_deathPending = false; g_deathSuppress = false; g_wasAlive = false;

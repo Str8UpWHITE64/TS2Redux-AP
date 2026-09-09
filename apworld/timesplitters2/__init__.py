@@ -11,22 +11,31 @@ import logging
 from typing import Any, Dict, List, Tuple
 
 from BaseClasses import Item, ItemClassification, Location, LocationProgressType, Region
+from Options import OptionError
 from worlds.AutoWorld import World, WebWorld
 
 from . import data
 from .options import TS2Options
 
-# Game Mode (options.GameMode). story = the 10 missions + their objectives; arcade = the 66 trophy events
-# (45 Arcade matches + 21 Challenges, which the option treats as one "Arcade" bucket).
-MODE_BOTH, MODE_STORY_ONLY, MODE_ARCADE_ONLY = 0, 1, 2
+# Game Modes (options.GameModes): TS2's three top-level modes, in canonical order. Held as an ordered tuple rather than
+# a set -- what survives decides the pool, and set iteration order is not stable between processes.
+MODE_NAMES = ("Story", "Arcade", "Challenge")
+# Pre-1.0.2 seeds carried a single game_mode int instead. Kept so a UT regen of an old seed still reads correctly, and
+# so fill_slot_data can echo the int back for older clients when the mode set happens to match one of them exactly.
+LEGACY_BOTH, LEGACY_STORY_ONLY, LEGACY_ARCADE_ONLY = 0, 1, 2
+LEGACY_MODE_SETS = {LEGACY_BOTH: frozenset(MODE_NAMES),
+                    LEGACY_STORY_ONLY: frozenset({"Story"}),
+                    LEGACY_ARCADE_ONLY: frozenset({"Arcade", "Challenge"})}
 # Weapon Shuffle Scope (options.WeaponShuffleScope). within_level is the only one that needs a PER-LEVEL map -- the
 # client re-applies the weapon tables on every level load, so the same slot can be a different gun per level.
 SCOPE_COMPLETELY_RANDOM, SCOPE_SAME_CLASS, SCOPE_WITHIN_LEVEL = 0, 1, 2
 # slot_data schema version. Bump whenever the KEYS the client reads change, so a mismatched client can say so
-# instead of silently mis-reading a seed. 9 = added arcade_death_link_threshold. 8 = added starting_units /
-# starting_weapons (Universal Tracker regen must restore the seed's starters rather than re-roll them). 7 = added
-# game_mode / arcade_goal_* / weapon_shuffle_scope / weapon_remap_by_level (6 = the pre-1.0.0 schema, old content_mode).
-SLOT_DATA_VERSION = 9
+# instead of silently mis-reading a seed. 10 = game_mode (int) replaced by game_modes / story_content /
+# goal_trophy_events / trophy_goal_*; the client still reads the old int so pre-1.0.2 seeds keep working. 9 = added
+# arcade_death_link_threshold. 8 = added starting_units / starting_weapons (a Universal Tracker regen must restore the
+# seed's starters rather than re-roll them). 7 = added game_mode / arcade_goal_* / weapon_shuffle_scope /
+# weapon_remap_by_level (6 = the pre-1.0.0 schema, which used the old content_mode key).
+SLOT_DATA_VERSION = 10
 
 
 class TS2Item(Item):
@@ -66,6 +75,14 @@ class TS2World(World):
     def interpret_slot_data(self, slot_data: dict) -> dict:
         return slot_data
 
+    def _set_modes(self, keep) -> None:
+        """Record the modes this seed keeps, in canonical order, plus the three flags the rest of the world reads."""
+        keep = set(keep or MODE_NAMES)
+        self.modes = tuple(m for m in MODE_NAMES if m in keep)
+        self.story = "Story" in keep
+        self.arcade = "Arcade" in keep
+        self.challenge = "Challenge" in keep
+
     def generate_early(self) -> None:
         pt = self._ut_passthrough()
         if pt:   # UT regen: options are defaults here, so rebuild every logic-affecting value from the seed's slot_data
@@ -83,19 +100,23 @@ class TS2World(World):
                                           if int(mi) < len(data.STORY)}
             self.tc_required = pt["time_crystals_required"]
             self.tc_total = pt["time_crystals_total"]
-            self.mode = pt.get("game_mode", MODE_BOTH)
-            self.arcade_goal_pct = pt.get("arcade_goal_percentage", 90)
+            self._set_modes(pt.get("game_modes") or LEGACY_MODE_SETS.get(pt.get("game_mode", LEGACY_BOTH)))
+            self.trophy_goal_pct = pt.get("trophy_goal_percentage", pt.get("arcade_goal_percentage", 90))
             return
         self._ut = False
-        self.mode = self.options.game_mode.value                       # 0=both 1=story_only 2=arcade_only
-        self.arcade_goal_pct = self.options.arcade_goal_percentage.value
+        keep = set(self.options.game_modes.value)
+        if not keep:
+            raise OptionError(f"TimeSplitters 2 (player {self.player}): Game Modes is empty. Keep at least one of "
+                              f"{', '.join(MODE_NAMES)} -- with none of them there is nothing to randomize.")
+        self._set_modes(keep)
+        self.trophy_goal_pct = self.options.trophy_goal_percentage.value
         self.gating = bool(self.options.weapon_gating.value)
         self.shuffle = bool(self.options.weapon_shuffle.value)
-        if self.mode == MODE_ARCADE_ONLY:
-            # Weapon Gating / Shuffle only ever affect STORY missions (the client applies them behind g_inStory), and
-            # arcade_only has no story checks -- so they would be silent no-ops that still bloat the item pool. Force off.
+        if not self.story:
+            # Weapon Gating / Shuffle only ever affect STORY missions (the client applies them behind g_inStory), so
+            # without Story they would be silent no-ops that still bloat the item pool. Force off.
             if self.gating or self.shuffle:
-                logging.info("TimeSplitters 2 (player %d): arcade_only -- Weapon Gating/Shuffle forced off "
+                logging.info("TimeSplitters 2 (player %d): Story not in Game Modes -- Weapon Gating/Shuffle forced off "
                              "(they only affect story missions).", self.player)
             self.gating = False
             self.shuffle = False
@@ -153,12 +174,13 @@ class TS2World(World):
         tiers = self.tiers
         diffs = self.diffs
         out: List[Tuple[str, str]] = []        # (AP location name, AP item name that unlocks it)
-        if self.mode != MODE_STORY_ONLY:                      # Arcade matches + Challenges
-            for _, _, name in data.TROPHY_EVENTS:
-                for t in data.TROPHY_TIERS:
-                    if t in tiers:
-                        out.append((f"{data.DISPLAY_OF[name]} ({t})", data.ITEM_OF[name]))
-        if self.mode != MODE_ARCADE_ONLY:                     # story missions + their objectives
+        for kind, _, name in data.TROPHY_EVENTS:              # Arcade matches and Challenges, each gated on its own
+            if not self._kind_kept(kind):
+                continue
+            for t in data.TROPHY_TIERS:
+                if t in tiers:
+                    out.append((f"{data.DISPLAY_OF[name]} ({t})", data.ITEM_OF[name]))
+        if self.story:                                        # story missions + their objectives
             for m in data.STORY:
                 for d in data.STORY_DIFFICULTIES:
                     if d in diffs:
@@ -169,15 +191,27 @@ class TS2World(World):
                         out.append((data.objective_location_name(m, name), data.ITEM_OF[m]))
         return out
 
-    def _arcade_event_items(self) -> List[str]:
-        """The distinct unlock items behind the active Arcade + Challenge checks (one per trophy event)."""
+    def _kind_kept(self, kind: str) -> bool:
+        """Is this trophy event's mode ("arcade" / "challenge") one the player kept?"""
+        return self.arcade if kind == "arcade" else self.challenge
+
+    def _trophy_event_items(self) -> List[str]:
+        """The distinct unlock items behind the trophy checks this seed KEEPS (one per event, in catalog order).
+        Follows Game Modes, so a Challenge-only seed counts its 21 challenges and nothing else."""
         seen, out = set(), []
-        for _, _, name in data.TROPHY_EVENTS:
+        for kind, _, name in data.TROPHY_EVENTS:
+            if not self._kind_kept(kind):
+                continue
             it = data.ITEM_OF[name]
             if it not in seen:
                 seen.add(it)
                 out.append(it)
         return out
+
+    def _goal_trophy_eis(self) -> List[int]:
+        """Event indices whose trophies count toward the goal -- the client counts only these, so an Arcade trophy
+        can never advance a Challenge-only goal."""
+        return [i for i, (kind, _, _) in enumerate(data.TROPHY_EVENTS) if self._kind_kept(kind)]
 
     def _excluded(self, loc_name: str, unit: str) -> bool:
         # filler-only (no progression) locations: Space Station's terminal checks (behind the goal+Time Crystal gate),
@@ -280,8 +314,8 @@ class TS2World(World):
         # Time Crystals: progression that gates the final stage. They open no location, so they fit only in
         # the NON-excluded "slack" beyond one-per-unit; keep ~20% as Banana filler so the self-gating chain always has
         # leaf locations. Total placed = Required + Extra (so Required can never exceed what's placed), clamped to slack.
-        if self.mode == MODE_ARCADE_ONLY:
-            # No final stage to gate (the goal is a percentage of the Arcade/Challenge checks), so Time Crystals would be
+        if not self.story:
+            # No final stage to gate (the goal is a percentage of the trophy checks), so Time Crystals would be
             # dead progression items. Place none; the freed slots become ordinary bonus/filler below.
             if not self._ut:
                 self.tc_total = 0
@@ -350,19 +384,19 @@ class TS2World(World):
         # NB: the map is looked up PER MISSION (self._remap_for) -- within_level gives every level its own.
         sel_diffs = set(self.diffs)
 
-        # GOAL. Story modes: the final stage (Space Station) needs its own unlock AND the required Time Crystals;
-        # has(...,0) is True. Arcade-only: there is no Space Station, so the goal is completing Arcade Goal Percentage
-        # of the Arcade/Challenge checks -- every such check sits behind its event's unlock and each event contributes
-        # the same number of tier checks, so "that share of the checks" == "that share of the event unlocks".
-        if self.mode == MODE_ARCADE_ONLY:
-            event_items = self._arcade_event_items()
-            need_events = max(1, -(-len(event_items) * self.arcade_goal_pct // 100))   # ceil
-            self.arcade_goal_events = need_events
+        # GOAL. With Story kept: the final stage (Space Station) needs its own unlock AND the required Time Crystals;
+        # has(...,0) is True. Without Story there is no Space Station, so the goal is completing Trophy Goal Percentage
+        # of the trophy checks THIS SEED KEPT -- every such check sits behind its event's unlock and each event
+        # contributes the same number of tier checks, so "that share of the checks" == "that share of the event unlocks".
+        if not self.story:
+            event_items = self._trophy_event_items()
+            need_events = max(1, -(-len(event_items) * self.trophy_goal_pct // 100))   # ceil
+            self.trophy_goal_events = need_events
 
             def goal_rule(state) -> bool:
                 return sum(1 for it in event_items if state.has(it, p)) >= need_events
         else:
-            self.arcade_goal_events = 0
+            self.trophy_goal_events = 0
 
             def goal_rule(state) -> bool:
                 return state.has(final, p) and state.has(tc, p, req)
@@ -441,7 +475,7 @@ class TS2World(World):
         # (unlock + Time Crystals) let go-mode fire before those weapons were in logic, so a tracker showed go-mode while
         # the Space Station checks stayed dark. Only in story modes with gating; goal_rule stays the per-location gate
         # (each Space Station location already ANDs in its OWN difficulty's weapon rule, so it must not inherit Hard's).
-        if self.mode != MODE_ARCADE_ONLY and gating:
+        if self.story and gating:
             gd = self.goal_difficulty
             def victory_rule(state) -> bool:
                 return goal_rule(state) and complete_ok(data.FINAL_STORY_MISSION, gd, frozenset({gd}), state)
@@ -452,16 +486,24 @@ class TS2World(World):
 
     # ---- client handshake ----
     def fill_slot_data(self) -> Dict[str, Any]:
-        # arcade_only GOAL: the client fires it once this many Arcade/Challenge checks are done (every trophy event
-        # contributes one check per selected tier). 0 in the story modes, where the goal is the Space Station clear.
-        arcade_goal_checks = 0
-        if self.mode == MODE_ARCADE_ONLY:
-            total = len(data.TROPHY_EVENTS) * len(self.tiers)
-            arcade_goal_checks = max(1, -(-total * self.arcade_goal_pct // 100))   # ceil
-        return {
-            "game_mode": self.mode,                          # 0=both 1=story_only 2=arcade_only
-            "arcade_goal_percentage": self.arcade_goal_pct,
-            "arcade_goal_checks": arcade_goal_checks,        # arcade_only: fire GOAL at this many Arcade/Challenge checks
+        # No-Story GOAL: the client fires it once this many trophy checks are done. Counted over the events this seed
+        # KEPT (each contributes one check per selected tier), so a Challenge-only seed needs challenge trophies alone.
+        # 0 whenever Story is kept, where the goal is the Space Station clear instead.
+        goal_eis = self._goal_trophy_eis()
+        trophy_goal_checks = 0
+        if not self.story:
+            total = len(goal_eis) * len(self.tiers)
+            trophy_goal_checks = max(1, -(-total * self.trophy_goal_pct // 100))   # ceil
+        # Legacy hint for pre-1.0.2 clients, which only understood a single game_mode int. Sent ONLY when the kept set
+        # is exactly one of the three old modes; for a new combination it is omitted rather than approximated, so an old
+        # client falls back to "both" and simply never auto-fires a goal instead of firing the wrong one early.
+        legacy = next((v for v, ms in LEGACY_MODE_SETS.items() if ms == frozenset(self.modes)), None)
+        out = {
+            "game_modes": list(self.modes),                  # canonical order; the client reads story/arcade/challenge
+            "trophy_goal_percentage": self.trophy_goal_pct,
+            "trophy_goal_checks": trophy_goal_checks,         # fire GOAL at this many trophy checks (0 = Space Station goal)
+            "goal_trophy_events": goal_eis,                   # event indices that COUNT toward that goal
+            "story_content": self.story,                      # is there a Space Station clear to win on?
             "time_crystals_required": self.tc_required,      # client keeps Space Station locked until this many arrive
             "time_crystals_total": self.tc_total,
             "story_difficulty_checks": sorted(self.diffs),               # cumulative tiers up to the chosen max
@@ -512,3 +554,6 @@ class TS2World(World):
             "arcade_death_link_threshold": self.options.arcade_death_link_threshold.value,
             "version": SLOT_DATA_VERSION,
         }
+        if legacy is not None:
+            out["game_mode"] = legacy
+        return out

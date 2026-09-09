@@ -1,37 +1,37 @@
 from dataclasses import dataclass
 
-from Options import Range, Choice, DeathLink, PerGameCommonOptions, StartInventoryPool, Toggle
+from Options import Choice, DeathLink, OptionSet, PerGameCommonOptions, Range, StartInventoryPool, Toggle
 
 from . import data
 
 
-class GameMode(Choice):
-    """Which parts of the game are randomized.
+class GameModes(OptionSet):
+    """Which of TimeSplitters 2's three modes produce checks. Remove any you would rather not play.
 
-    both        - Story missions AND Arcade + Challenge events all produce checks (the full game). Goal: clear Space
-                  Station on your Max Story Difficulty, once you have enough Time Crystals.
-    story_only  - ONLY the story missions and their objectives produce checks; Arcade and Challenge are left empty.
-                  Goal: clear Space Station on your Max Story Difficulty, once you have enough Time Crystals.
-    arcade_only - ONLY Arcade matches and Challenges produce checks; the story is left empty. There is no Space Station
-                  to clear, so the goal is instead to complete Arcade Goal Percentage of those checks. Time Crystals
-                  are not used, and Weapon Gating / Weapon Shuffle are forced OFF (they only affect story missions).
+    Story     - the 10 story missions, their per-difficulty completions, and their objectives.
+    Arcade    - the 45 Arcade League matches, one check per trophy tier.
+    Challenge - the 21 Challenges, one check per trophy tier.
 
-    Time Crystals are ITEMS sent to you from the multiworld -- other players' checks find them, and they arrive like any
-    other item. Space Station stays locked until you have collected the number set by Time Crystals Required to Finish,
-    so the final mission is gated on the multiworld rather than on your own progress."""
-    display_name = "Game Mode"
-    option_both = 0
-    option_story_only = 1
-    option_arcade_only = 2
-    default = 0   # both
+    At least one must be kept. Dropping a mode removes its checks and its unlock items; what they held becomes
+    filler, so a shorter list mainly makes for a smaller, denser seed.
+
+    THE GOAL FOLLOWS THIS LIST. With Story kept, you win by clearing Space Station on your Max Story Difficulty once
+    enough Time Crystals have arrived from the multiworld. With Story removed there is no Space Station to clear, so
+    you instead win by completing Trophy Goal Percentage of whichever Arcade / Challenge checks you kept, no Time
+    Crystals are placed, and Weapon Gating / Weapon Shuffle are forced off (they only ever affect story missions)."""
+    display_name = "Game Modes"
+    valid_keys = ("Story", "Arcade", "Challenge")
+    default = frozenset(valid_keys)
 
 
-class ArcadeGoalPercentage(Range):
-    """ARCADE-ONLY goal: the percentage of the Arcade + Challenge checks you must complete to win. Ignored unless
-    Game Mode is arcade_only (the story modes finish on Space Station instead)."""
+class TrophyGoalPercentage(Range):
+    """The share of your Arcade / Challenge checks you must complete to win when Story is NOT in Game Modes.
+
+    Counted over the trophy checks the seed actually has, so it follows Game Modes: keep only Challenge and it is a
+    percentage of the Challenge checks alone. Ignored whenever Story is kept, since that wins on Space Station."""
     range_start = 10
     range_end = 100
-    display_name = "Arcade Goal Percentage"
+    display_name = "Trophy Goal Percentage"
     default = 90
 
 
@@ -184,8 +184,8 @@ class ArcadeDeathLinkThreshold(Range):
 
 @dataclass
 class TS2Options(PerGameCommonOptions):
-    game_mode: GameMode
-    arcade_goal_percentage: ArcadeGoalPercentage
+    game_modes: GameModes
+    trophy_goal_percentage: TrophyGoalPercentage
     story_difficulty: StoryDifficulty
     trophy_tier: TrophyTier
     time_crystals_required: TimeCrystalsRequired

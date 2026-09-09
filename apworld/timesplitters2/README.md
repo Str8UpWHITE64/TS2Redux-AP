@@ -12,7 +12,7 @@ enforces the locks and reports checks. `game` name: **`TimeSplitters 2`**.
 | Story difficulties | 30 | 10 missions × 3 difficulties (Easy / Normal / Hard) |
 | Objectives | 68 | per-mission objective completions |
 
-The 66 trophy events are 45 Arcade matches + 21 Challenges. A trophy/story check fires when you reach that
+The 66 trophy events are 45 Arcade matches + 21 Challenges, each toggled separately by `game_modes`. A trophy/story check fires when you reach that
 tier/difficulty in-game; trophies are cumulative, so a single Gold clear fires Bronze + Silver + Gold. Which checks are *active* in a seed is option-driven (e.g. a
 Bronze-tier seed only uses the Bronze checks), but every location id is pre-allocated and stable, so changing
 options never renumbers existing seeds.
@@ -31,12 +31,13 @@ The actual pool placed in a seed depends on the options below.
 
 ## Goal
 
-Depends on **`game_mode`**:
+Follows **`game_modes`**:
 
-- **`both` / `story_only`** — clear the final story mission (**Space Station**) on your chosen **Max Story
-  Difficulty**, once you have collected enough **Time Crystals**.
-- **`arcade_only`** — there is no Space Station to clear, so instead complete **`arcade_goal_percentage`** of
-  the Arcade + Challenge checks.
+- **Story kept** — clear the final story mission (**Space Station**) on your chosen **Max Story Difficulty**,
+  once you have collected enough **Time Crystals**.
+- **Story removed** — there is no Space Station to clear, so instead complete **`trophy_goal_percentage`** of
+  the trophy checks you kept. Counted over what the seed actually has, so a Challenge-only seed needs that share
+  of its 21 Challenges alone. No Time Crystals are placed, and the weapon options are forced off.
 
 **Time Crystals** are items sent to you from the multiworld — they are scattered among all players' checks, so
 they arrive as other people play. Space Station stays locked until `time_crystals_required` of them have
@@ -46,8 +47,8 @@ arrived, which is what ties the final mission to the multiworld rather than to y
 
 | Option | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `game_mode` | both / story_only / arcade_only | both | which halves of the game produce checks (see **Goal**) |
-| `arcade_goal_percentage` | 10–100 | 90 | `arcade_only` only: share of Arcade + Challenge checks needed to win |
+| `game_modes` | any of Story / Arcade / Challenge | all three | which modes produce checks; at least one required (see **Goal**) |
+| `trophy_goal_percentage` | 10–100 | 90 | share of your Arcade/Challenge checks needed to win; only when Story is removed |
 | `story_difficulty` | Easy / Normal / Hard | Normal | the MAX difficulty; checks are produced up to it, and the goal fires on it |
 | `trophy_tier` | Bronze / Silver / Gold / Platinum | Gold | the MAX trophy tier; checks are produced up to it |
 | `time_crystals_required` | 0–60 | 8 | Time Crystals needed to unlock Space Station (auto-clamped to free slots) |

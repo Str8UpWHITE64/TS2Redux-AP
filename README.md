@@ -37,10 +37,11 @@ and emits `client/ts2_data.h`, so the Python and C++ sides always agree on item/
   completions.
 - **Weapons as items** — two modes: **gating** (weapons stay locked until you receive them) and
   **shuffle** (one global mapping remaps your loadout, level pickups, and enemy weapons).
-- **Game modes** — randomize the **story**, the **arcade & challenge** side, or **both**.
-- **Progression goal** — in story modes the final mission (Space Station) is gated behind **Time
-  Crystals**, and the goal is clearing it on your chosen difficulty once you've collected enough. In
-  arcade-only, the goal is instead a chosen percentage of the arcade & challenge checks.
+- **Game modes** — pick any combination of **Story**, **Arcade**, and **Challenge**; drop the ones you
+  don't want to play and their checks and unlocks leave the seed with them.
+- **Progression goal** — with Story kept, the final mission (Space Station) is gated behind **Time
+  Crystals** and the goal is clearing it on your chosen difficulty. Without Story, the goal is instead a
+  chosen percentage of whichever Arcade / Challenge checks you kept.
 - **Traps** — short, comedic cheats (big/small heads, big hands, fat/cardboard/invisible enemies,
   rotating heads, slow-mo deaths) that fire briefly during story missions.
 - **Bonus / filler** — one-time Health, Armor, and Ammo packs, granted the next time you're in a level.

@@ -12,7 +12,7 @@ complete, hidden TS2 port that ships inside *Homefront: The Revolution* and is r
 
 Two halves talk to an Archipelago server:
 
-- **The apworld** (`apworld/timesplitters2/`) runs **server-side**. It defines TS2's items,
+- **The apworld** (`apworld/ts2redux/`) runs **server-side**. It defines TS2's items,
   locations, and rules, and generates the seed.
 - **The client DLL** (`client/`, built as `Scotch.dll`) runs **in-game**. It locks content you
   haven't received, watches for completions, and reports them back as checks.
@@ -24,8 +24,8 @@ and emits `client/ts2_data.h`, so the Python and C++ sides always agree on item/
 
 | Path | What it is |
 | --- | --- |
-| [`apworld/timesplitters2/`](apworld/timesplitters2) | The Archipelago world — items, locations, rules, options ([README](apworld/timesplitters2/README.md)) |
-| [`apworld/build_apworld.py`](apworld/build_apworld.py) | Packages + verifies `timesplitters2.apworld` |
+| [`apworld/ts2redux/`](apworld/ts2redux) | The Archipelago world — items, locations, rules, options ([README](apworld/ts2redux/README.md)) |
+| [`apworld/build_apworld.py`](apworld/build_apworld.py) | Packages + verifies `ts2redux.apworld` |
 | [`client/`](client) | The in-game DLL, built as `Scotch.dll` ([README](client/README.md)) |
 | [`client/RFPatch/`](client/RFPatch) | Standalone Robot Factory softlock fix, usable without Archipelago |
 | [`install/`](install) | Player setup docs, the config template, and the release packager ([README](install/README.md)) |
@@ -49,7 +49,7 @@ and emits `client/ts2_data.h`, so the Python and C++ sides always agree on item/
   takes the linked players with you, and theirs takes you. Incoming deaths apply anywhere, but since Arcade
   and Challenge are deathmatches, deaths there only go out once every *N* (configurable, or never).
 
-See [`apworld/timesplitters2/README.md`](apworld/timesplitters2/README.md) for the full item /
+See [`apworld/ts2redux/README.md`](apworld/ts2redux/README.md) for the full item /
 location / option breakdown.
 
 ## Requirements
@@ -58,7 +58,7 @@ location / option breakdown.
 - A working **TS2 Redux v0.2.7** install, set up with its installer's default selections. See
   [HFTSRedux/TS2Redux](https://github.com/HFTSRedux/TS2Redux/releases/tag/v0.2.7).
 - **Archipelago 0.6.x** (for generating/hosting).
-- The built **`timesplitters2.apworld`**.
+- The built **`ts2redux.apworld`**.
 
 ## Install (players)
 
@@ -67,7 +67,9 @@ location / option breakdown.
    installer — **leave every selection at its default** and add nothing extra.
 2. Drop the AP client (`Scotch.dll`) into `Bin64\TS2Redux\`, and put `AP_client.cfg` in the game root.
    Those two files are the entire download; nothing from TS2 Redux is replaced.
-3. Install `timesplitters2.apworld` into Archipelago (`custom_worlds/`).
+3. Install `ts2redux.apworld` into Archipelago (`custom_worlds/`). Upgrading from 1.0.x? The game is now
+   `TimeSplitters 2 Redux`, and the old `timesplitters2.apworld` has to go: delete it, or, if you also play the
+   GameCube version, install its `timesplitters2.apworld` over it (the GameCube world now uses that file name).
 
 Full step-by-step is in [`install/README.md`](install/README.md). A ready-to-edit config template is
 at [`install/AP_client.cfg`](install/AP_client.cfg).
@@ -79,9 +81,9 @@ at [`install/AP_client.cfg`](install/AP_client.cfg).
 
 ## Archipelago setup (host / seed-roller)
 
-1. Place `timesplitters2.apworld` in Archipelago's `custom_worlds/`.
-2. Write a `TimeSplitters 2` player YAML — options are documented in the
-   [apworld README](apworld/timesplitters2/README.md).
+1. Place `ts2redux.apworld` in Archipelago's `custom_worlds/`.
+2. Write a `TimeSplitters 2 Redux` player YAML — options are documented in the
+   [apworld README](apworld/ts2redux/README.md).
 3. Run **Generate**, then host the server.
 
 ## Connecting in-game

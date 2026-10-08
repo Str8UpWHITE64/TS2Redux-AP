@@ -62,6 +62,6 @@ against. Include that line when reporting a problem.
 
 ## Server (host / seed-roller)
 
-Separate from the in-game payload: drop `timesplitters2.apworld` into Archipelago's `custom_worlds/`,
-add a `TimeSplitters 2` player YAML (see [`apworld/timesplitters2/README.md`](../apworld/timesplitters2/README.md)
+Separate from the in-game payload: drop `ts2redux.apworld` into Archipelago's `custom_worlds/`,
+add a `TimeSplitters 2 Redux` player YAML (see [`apworld/ts2redux/README.md`](../apworld/ts2redux/README.md)
 for the options), run `Generate`, and host the server.

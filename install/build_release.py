@@ -21,7 +21,7 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CLIENT_DLL = os.path.join(ROOT, "client", "x64", "Release", "AP.dll")
-MANIFEST = os.path.join(ROOT, "apworld", "timesplitters2", "archipelago.json")
+MANIFEST = os.path.join(ROOT, "apworld", "ts2redux", "archipelago.json")
 
 README_TXT = """\
 TS2 Redux: Archipelago Edition -- client
@@ -58,8 +58,10 @@ Delete Scotch.dll and AP_client.cfg. Your TS2 Redux install is untouched.
 
 SEED ROLLING
 
-The host also needs timesplitters2.apworld in Archipelago's custom_worlds/ folder, plus a
-"TimeSplitters 2" player YAML. Options are documented with the apworld.
+The host also needs ts2redux.apworld in Archipelago's custom_worlds/ folder, plus a
+"TimeSplitters 2 Redux" player YAML. Options are documented with the apworld. Upgrading from
+1.0.x: the old timesplitters2.apworld has to go. Delete it, or, if you also play the GameCube
+version, install its timesplitters2.apworld over it (the GameCube world now uses that file name).
 """
 
 

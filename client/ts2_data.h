@@ -1,5 +1,5 @@
 #pragma once
-// GENERATED from worlds/timesplitters2/data.py -- do not edit by hand (run gen_header.py).
+// GENERATED from worlds/ts2redux/data.py -- do not edit by hand (run gen_header.py).
 // Keeps the client's ids/names in lockstep with the apworld.
 #include <cstdint>
 

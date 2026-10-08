@@ -2,7 +2,7 @@
 
 The server-side `.apworld` for the TimeSplitters 2 Archipelago randomizer. It defines the items,
 locations, and rules and generates the seed; the in-game client DLL (in [`../../client/`](../../client))
-enforces the locks and reports checks. `game` name: **`TimeSplitters 2`**.
+enforces the locks and reports checks. `game` name: **`TimeSplitters 2 Redux`**.
 
 ## Locations (362)
 
@@ -76,7 +76,7 @@ Plus the standard `start_inventory_from_pool`.
 
 ## Generating
 
-Place `timesplitters2.apworld` in an Archipelago 0.6.x install's `custom_worlds/` (or copy the
-`timesplitters2/` folder into a source checkout's `worlds/`), add a `TimeSplitters 2:` player YAML using the
-options above, and run **Generate**. To build the `.apworld`, zip this `timesplitters2/` folder (archive root
+Place `ts2redux.apworld` in an Archipelago 0.6.x install's `custom_worlds/` (or copy the
+`ts2redux/` folder into a source checkout's `worlds/`), add a `TimeSplitters 2 Redux:` player YAML using the
+options above, and run **Generate**. To build the `.apworld`, zip this `ts2redux/` folder (archive root
 = the folder, excluding `__pycache__`) and rename `.zip` → `.apworld`.

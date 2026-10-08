@@ -1,11 +1,11 @@
-"""Build timesplitters2.apworld from the source folder.
+"""Build ts2redux.apworld from the source folder.
 
 An .apworld is just a zip whose archive root is the world package folder. Only the source files are shipped --
 never __pycache__: a stale .pyc inside the archive can shadow the real module and make an install behave like an
 older build.
 
-    python build_apworld.py                     -> ./timesplitters2.apworld
-    python build_apworld.py --out DIR           -> DIR/timesplitters2.apworld
+    python build_apworld.py                     -> ./ts2redux.apworld
+    python build_apworld.py --out DIR           -> DIR/ts2redux.apworld
     python build_apworld.py --install           -> also copy into the local Archipelago custom_worlds/
 
 Verifies the result: every member byte-matches its source, the zip passes an integrity check, and no
@@ -20,7 +20,7 @@ import shutil
 import sys
 import zipfile
 
-PKG = "timesplitters2"
+PKG = "ts2redux"
 # Everything the world needs at runtime, plus the README that documents it. Keep this list explicit rather than
 # globbing, so a stray scratch file in the folder can never end up in a release.
 MEMBERS = ["__init__.py", "data.py", "options.py", "gen_header.py", "archipelago.json", "README.md"]

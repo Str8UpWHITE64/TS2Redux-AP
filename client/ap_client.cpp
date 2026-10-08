@@ -34,7 +34,7 @@
 #include "ts2_fresh_profile.h"
 
 using nlohmann::json;
-static const char* GAME = "TimeSplitters 2";
+static const char* GAME = "TimeSplitters 2 Redux";
 // slot_data schema this client understands; must track SLOT_DATA_VERSION in the apworld's __init__.py.
 static const int SLOT_DATA_VERSION = 10;
 

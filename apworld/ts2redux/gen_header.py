@@ -1,6 +1,6 @@
 """Generate client/ts2_data.h from data.py so the client's ids/names stay in lockstep with the apworld.
 
-Run from the repo root:  python -m timesplitters2.gen_header   (or:  python apworld/timesplitters2/gen_header.py)
+Run from the repo root:  python -m ts2redux.gen_header   (or:  python apworld/ts2redux/gen_header.py)
 after adding apworld/ to PYTHONPATH, or simply run this file directly.
 """
 import os, sys
@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import data as d  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# repo layout: apworld/timesplitters2/gen_header.py -> client/ts2_data.h
+# repo layout: apworld/ts2redux/gen_header.py -> client/ts2_data.h
 OUT = os.path.normpath(os.path.join(HERE, "..", "..", "client", "ts2_data.h"))
 
 KIND = {"arcade": 0, "challenge": 1}  # story = 2
@@ -24,7 +24,7 @@ def main():
     L = []
     w = L.append
     w("#pragma once")
-    w("// GENERATED from worlds/timesplitters2/data.py -- do not edit by hand (run gen_header.py).")
+    w("// GENERATED from worlds/ts2redux/data.py -- do not edit by hand (run gen_header.py).")
     w("// Keeps the client's ids/names in lockstep with the apworld.")
     w("#include <cstdint>")
     w("")

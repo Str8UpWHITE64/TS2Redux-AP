@@ -45,11 +45,11 @@ TC_REQUIRED_FLOOR = 7
 
 
 class TS2Item(Item):
-    game = "TimeSplitters 2"
+    game = "TimeSplitters 2 Redux"
 
 
 class TS2Location(Location):
-    game = "TimeSplitters 2"
+    game = "TimeSplitters 2 Redux"
 
 
 class TS2Web(WebWorld):
@@ -59,7 +59,7 @@ class TS2Web(WebWorld):
 
 class TS2World(World):
     """TimeSplitters 2 (Homefront port / TS2 Redux)."""
-    game = "TimeSplitters 2"
+    game = "TimeSplitters 2 Redux"
     options_dataclass = TS2Options
     options: TS2Options
     web = TS2Web()
@@ -76,7 +76,7 @@ class TS2World(World):
     ut_can_gen_without_yaml = True
 
     def _ut_passthrough(self) -> dict:
-        return getattr(self.multiworld, "re_gen_passthrough", {}).get("TimeSplitters 2", {})
+        return getattr(self.multiworld, "re_gen_passthrough", {}).get(self.game, {})
 
     def interpret_slot_data(self, slot_data: dict) -> dict:
         return slot_data
